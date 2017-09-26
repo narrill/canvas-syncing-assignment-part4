@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- import the websocket client library. You can code websockets from scratch
+         but we will just import a library. In this case we are using socket.io which is 
+         one of the most popular and feature rich websocket libraries.
+         
+         You can point the src for the script to any host online, but
+         by default the socket.io nodejs library will host the client library
+         online at your node.js address under /socket.io/socket.io.js 
+         You can disable that on the server if desired
+    -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
+    <script type="text/babel">
+        let socket;
+        let canvas;
+        let context;
+        let rect;
+        const canvases = {};
+        const contexts = {};
+        const myColor = 'rgb(' + (Math.floor(Math.random() * 256)) + ',' + (Math.floor(Math.random() * 256)) + ',' + (Math.floor(Math.random() * 256)) + ')';
+
+        const getRandomArbitrary = (min, max) => {
+          return Math.random() * (max - min) + min;
+        };
+
+        const createRect = (pos) => {            
+            var dimensions = {
+                x: getRandomArbitrary(10,100),
+                y: getRandomArbitrary(10,100)
+            };
+
+            return {
+                x: pos.x - dimensions.x/2,
+                y: pos.y - dimensions.y/2,
+                dimensions: dimensions,
+                color: myColor,
+                time: Date.now()
+            };            
+        };
+
+        const redraw = () => {
+            context.fillStyle = myColor;
+            context.fillRect(rect.x, rect.y, rect.dimensions.x, rect.dimensions.y);
+        };
+
+        const sendImage = () => {
+            socket.emit('data', canvas.toDataURL());
+        };
+
+    	const init = () => {
+            canvas = document.querySelector("#mainCanvas");
+            context = canvas.getContext("2d");
+            socket = io.connect();
+
+            socket.on('newUser', (id) => {
+                const newCanvas = document.createElement("canvas");
+                newCanvas.width = 800;
+                newCanvas.height = 800;
+                newCanvas.id = `canvas${id}`;
+
+                canvases[id] = newCanvas;
+                contexts[id] = newCanvas.getContext('2d');
+                document.body.appendChild(newCanvas);
+            });
+            socket.on('data', (data) => {
+                let image = new Image();
+                const ctx = contexts[data.id];
+                const canvas = canvases[data.id];
+                console.log(data, ctx);
+                if(ctx && canvas){
+                    console.log('drawing');
+                    image.onload = () => {
+                    console.log('context loaded');
+                        ctx.save();
+                        ctx.globalCompositeOperation = "source-over";//thisisdefaultforcanvas
+                        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                        ctx.restore();
+                    };
+
+                    image.src = data.imgData;
+                }
+            });
+            socket.on('dc', (id) => {
+                delete contexts[id];
+                delete canvases[id];
+
+                const elem = document.querySelector(`canvas${id}`);
+
+                if(elem)
+                    document.body.removeChild(elem);
+            });
+
+            canvas.onclick = (e) => {
+                var brect = canvas.getBoundingClientRect();
+                var pos =  {
+                  x: e.clientX - brect.left,
+                  y: e.clientY - brect.top
+                };
+
+                rect = createRect(pos);
+                redraw();
+                sendImage();
+            };
+    	};
+
+    	window.onload = init;
+    </script>
+	<style>
+		textarea {
+			display: block;
+			background-color: #EEEEEE;
+		}
+	</style>
+</head>
+<body>
+        <canvas id="mainCanvas" width="800" height="800"> </canvas>
+</body>
+</html>
