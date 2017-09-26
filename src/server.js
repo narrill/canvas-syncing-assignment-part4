@@ -25,7 +25,7 @@ io.sockets.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-  	socket.leave('room1');
+    socket.leave('room1');
     socket.broadcast.to('room1').emit('dc', id);
   });
 
